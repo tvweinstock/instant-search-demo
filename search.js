@@ -21,12 +21,45 @@ function app(opts) {
     apiKey: opts.apiKey,
     indexName: opts.indexName,
     urlSync: true,
-    searchFunction: opts.searchFunction,
-    searchParameters: {
-      getRankingInfo: true
-    }
+    searchFunction: opts.searchFunction
   });
 
+  //Custom hits widget with ranking info included
+  instantsearch.widgets.hitWithRankingInfo = function hitWithRankingInfo(container) {
+    return {
+      getConfiguration: function() {
+        return {
+          getRankingInfo: true
+        };
+      },
+      render: function(params) {
+        var results = params.results.hits;
+        container.innerHTML = results
+          .map(hit => {
+            return `
+                  <div class="hit">
+                    <div class="hit-image">
+                      <img src="${hit.image}" alt="${hit.name}">
+                    </div>
+                  <div class="hit-content">
+                    <h3 class="hit-price">$${hit.price}</h3>
+                    <h2 class="hit-name">${hit._highlightResult.name.value}</h2>
+                    <p class="hit-category-breadcrumb">${hit.categories}</p>
+                    <p class="hit-stars">${getStarsHTML(hit.rating)} (${hit.popularity})</p>
+                    <div class="hit-ranking">
+                      <span class="hit-ranking__trophy">🏆</span>
+                      <ul>${showRankingInfo(hit._rankingInfo)}</ul>
+                    </div>
+                    <p class="hit-description">${hit._highlightResult.description.value}</p>
+                  </div>
+                </div>
+
+          `;
+          })
+          .join('');
+      }
+    };
+  };
   // ---------------------
   //
   //  Default widgets
@@ -39,24 +72,7 @@ function app(opts) {
     })
   );
 
-  search.addWidget(
-    instantsearch.widgets.hits({
-      container: '#hits',
-      templates: {
-        item: getTemplate('hit'),
-        empty: getTemplate('no-results')
-      },
-      transformData: {
-        item(item) {
-          /* eslint-disable no-param-reassign */
-          item.starsLayout = getStarsHTML(item.rating);
-          item.categories = getCategoryBreadcrumb(item);
-          item.rankingLayout = showRankingInfo(item._rankingInfo);
-          return item;
-        }
-      }
-    })
-  );
+  search.addWidget(instantsearch.widgets.hitWithRankingInfo(document.querySelector('#hits')));
 
   search.addWidget(
     instantsearch.widgets.stats({
