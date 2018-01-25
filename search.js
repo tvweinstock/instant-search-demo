@@ -15,7 +15,6 @@ function app(opts) {
   //  Init
   //
   // ---------------------
-
   const search = instantsearch({
     appId: opts.appId,
     apiKey: opts.apiKey,
@@ -24,42 +23,40 @@ function app(opts) {
     searchFunction: opts.searchFunction
   });
 
-  //Custom hits widget with ranking info included
-  instantsearch.widgets.hitWithRankingInfo = function hitWithRankingInfo(container) {
+  // Extending the instantsearch.widgets namespace, like regular widgets
+  instantsearch.widgets.customRankingInfo = function customRankingInfo({ container }) {
+    // container should be a CSS selector, so we convert it into a DOM element
+    container = document.querySelector(container);
+    let rankingElement = null;
+
     return {
-      getConfiguration: function() {
+      // Method called at startup, to configure the Algolia settings
+      getConfiguration() {
         return {
           getRankingInfo: true
         };
       },
-      render: function(params) {
-        var results = params.results.hits;
-        container.innerHTML = results
-          .map(hit => {
-            return `
-                  <div class="hit">
-                    <div class="hit-image">
-                      <img src="${hit.image}" alt="${hit.name}">
-                    </div>
-                  <div class="hit-content">
-                    <h3 class="hit-price">$${hit.price}</h3>
-                    <h2 class="hit-name">${hit._highlightResult.name.value}</h2>
-                    <p class="hit-category-breadcrumb">${hit.categories}</p>
-                    <p class="hit-stars">${getStarsHTML(hit.rating)} (${hit.popularity})</p>
-                    <div class="hit-ranking">
-                      <span class="hit-ranking__trophy">🏆</span>
-                      <ul>${showRankingInfo(hit._rankingInfo)}</ul>
-                    </div>
-                    <p class="hit-description">${hit._highlightResult.description.value}</p>
-                  </div>
-                </div>
 
-          `;
+      // Called on the first instantsearch search
+      init({ helper }) {
+        container.innerHTML = `<ul></ul>`;
+        ulElement = container.querySelector('ul');
+        ulElement.innerHTML = `<li>hi tobi</li>`;
+      },
+
+      // Called whenever we receive new results from Algolia
+      render({ results }) {
+        const rankingResults = results.hits.map(hit => hit._rankingInfo);
+        const rankingHTML = Object.entries(rankingResults)
+          .map(([key, val]) => {
+            return `<span>${key}</span>: <span>${val}</span>`;
           })
           .join('');
+        ulElement.innerHTML = rankingHTML;
       }
     };
   };
+
   // ---------------------
   //
   //  Default widgets
@@ -72,7 +69,32 @@ function app(opts) {
     })
   );
 
-  search.addWidget(instantsearch.widgets.hitWithRankingInfo(document.querySelector('#hits')));
+  search.addWidget(
+    instantsearch.widgets.hits({
+      container: '#hits',
+      templates: {
+        item: getTemplate('hit'),
+        empty: getTemplate('no-results')
+      },
+      transformData: {
+        item(item) {
+          /* eslint-disable no-param-reassign */
+          item.starsLayout = getStarsHTML(item.rating);
+          item.categories = getCategoryBreadcrumb(item);
+          return item;
+        }
+      }
+    })
+  );
+
+  search.addWidget(
+    instantsearch.widgets.customRankingInfo({
+      container: '#hits',
+      templates: {
+        item: getTemplate('ranking-info')
+      }
+    })
+  );
 
   search.addWidget(
     instantsearch.widgets.stats({
@@ -265,11 +287,4 @@ function getStarsHTML(rating, maxRating) {
   }
 
   return html;
-}
-
-function showRankingInfo(rankingResult) {
-  const html = Object.entries(rankingResult).map(([key, val]) => {
-    return `<li><span>${key}</span>: <span>${val}</span></li>`;
-  });
-  return html.join('');
 }
