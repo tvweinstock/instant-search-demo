@@ -27,32 +27,40 @@ function app(opts) {
   instantsearch.widgets.customRankingInfo = function customRankingInfo({ container }) {
     // container should be a CSS selector, so we convert it into a DOM element
     container = document.querySelector(container);
-    let rankingElement = null;
-
     return {
       // Method called at startup, to configure the Algolia settings
       getConfiguration() {
         return {
+          // add rankingInfo to obtain
           getRankingInfo: true
         };
       },
 
-      // Called on the first instantsearch search
-      init({ helper }) {
-        container.innerHTML = `<ul></ul>`;
-        ulElement = container.querySelector('ul');
-        ulElement.innerHTML = `<li>hi tobi</li>`;
-      },
-
       // Called whenever we receive new results from Algolia
       render({ results }) {
-        const rankingResults = results.hits.map(hit => hit._rankingInfo);
-        const rankingHTML = Object.entries(rankingResults)
-          .map(([key, val]) => {
-            return `<span>${key}</span>: <span>${val}</span>`;
-          })
-          .join('');
-        ulElement.innerHTML = rankingHTML;
+
+        // add an id to each hit so we can target them later
+        const searchHits = document.querySelectorAll('.hit');
+        searchHits.forEach((hit, i) => hit.id = `hit-${i}`)
+
+        // create html that will contain ranking info
+        results.hits.map((hit, i) => {
+          const resultsContainer = document.createElement('div');
+          resultsContainer.className = "hit-ranking-info"
+          const trophy = document.createElement('span');
+          trophy.innerText = '🏆';
+          resultsContainer.appendChild(trophy);
+          const resultsUl = document.createElement('ul');
+          const rankingHtml = Object.entries(hit._rankingInfo).map(([key, val]) => {
+            return `<li><span>${key}: </span> <span>${val}</span></li>`
+          });
+          resultsUl.innerHTML = rankingHtml.join('');
+
+          resultsContainer.appendChild(resultsUl)
+          // append ranking results to hit
+          document.querySelector(`#hit-${i}`).appendChild(resultsContainer);
+        });
+
       }
     };
   };
@@ -89,10 +97,7 @@ function app(opts) {
 
   search.addWidget(
     instantsearch.widgets.customRankingInfo({
-      container: '#hits',
-      templates: {
-        item: getTemplate('ranking-info')
-      }
+      container: '#hits'
     })
   );
 
